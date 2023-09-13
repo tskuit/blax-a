@@ -25,6 +25,6 @@ jobs:
         with:
           path: 'blax-b-refix/'
           ref: "${{ github.event.inputs.branch }}"
-          repository: "${organization}/${repository}"
+          repository: "${{ organization }}/${{ repository }}"
 ##          repository: 'tskuit/blax-b'
 
