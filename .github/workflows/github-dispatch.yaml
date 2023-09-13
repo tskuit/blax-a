@@ -28,12 +28,20 @@ jobs:
         run: |
           echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
           echo "Tag name from github.ref_name: ${{ github.ref_name }}"
+          echo "Branch name from workflow_dispatch.inputs: ${{ github.event.inputs.branch }}"
 
       - name: Remote checkout blax-b repo
         uses: actions/checkout@v3
         with:
           path: 'blax-b/'
           ref: "${{ github.ref_name }}"
+          repository: 'tskuit/blax-b'
+
+      - name: Remote checkout blax-b repo ${{ github.event.inputs.branch }}
+        uses: actions/checkout@v3
+        with:
+          path: 'blax-b-refix/'
+          ref: "${{ github.event.inputs.branch }}"
           repository: 'tskuit/blax-b'
 
       - name: Remote ls
