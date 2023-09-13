@@ -1,12 +1,11 @@
 name: remote call
 on:
   workflow_dispatch:
-     inputs:
+    inputs:
       branch:
         description: 'Branch name'
         required: true
         default: main
-
 #      workflow2_github_account:
 #        description: 'GitHub Account Owner'
 #        required: true
