@@ -23,7 +23,7 @@ jobs:
         with:
           path: 'blax-b/'
           ref: "${{  github.ref_name }}"
-          repository: 'tskuit/blax-a'
+          repository: 'tskuit/blax-b'
 
 ##      - name: Checkout blax-b repo
 ##        uses: actions/checkout@v3
