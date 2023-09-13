@@ -1,5 +1,5 @@
-name: Call build by
-run-name: Run triggered by ${{ github.event.inputs.branch }}
+name: Remote image build. 
+run-name: Build triggered for branch ${{ github.event.inputs.branch }}.
 on:
   workflow_dispatch:
     inputs:
@@ -7,15 +7,10 @@ on:
         description: 'Branch name'
         required: true
         default: main
-#      workflow2_github_account:
-#        description: 'GitHub Account Owner'
-#        required: true
-#        default: ':userName'
-#
-#      workflow2_repo_github:
-#        description: 'repo-name'
-#        required: true
-#        default: ':repoName' 
+
+env:
+  organization: tskuit
+  repository: blax-b
 
 jobs:
   build:
@@ -25,28 +20,11 @@ jobs:
       - name: Remote build
         uses: docker/setup-buildx-action@v2
 
-      - name: Remote tags
-        run: |
-          echo "Tag name from GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          echo "Tag name from github.ref_name: ${{ github.ref_name }}"
-          echo "Branch name from workflow_dispatch.inputs: ${{ github.event.inputs.branch }}"
-
-      - name: Remote checkout blax-b repo
-        uses: actions/checkout@v3
-        with:
-          path: 'blax-b/'
-          ref: "${{ github.ref_name }}"
-          repository: 'tskuit/blax-b'
-
       - name: Remote checkout blax-b repo ${{ github.event.inputs.branch }}
         uses: actions/checkout@v3
         with:
           path: 'blax-b-refix/'
           ref: "${{ github.event.inputs.branch }}"
-          repository: 'tskuit/blax-b'
-
-      - name: Remote ls
-        run: |
-          ls
-
+          repository: "${organization}/${repository}"
+##          repository: 'tskuit/blax-b'
 
