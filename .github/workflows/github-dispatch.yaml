@@ -1,4 +1,5 @@
-name: remote call
+name: Call build by
+run-name: Run triggered by ${{ github.event.inputs.branch }}
 on:
   workflow_dispatch:
     inputs:
