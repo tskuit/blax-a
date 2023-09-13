@@ -36,7 +36,8 @@ jobs:
           ref: "${{ github.ref_name }}"
           repository: 'tskuit/blax-b'
 
-##      - name: Remote check
-##        run: |
-##	  ls -al
+      - name: Remote ls
+        run: |
+          ls
+
 
