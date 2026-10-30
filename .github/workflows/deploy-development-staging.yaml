@@ -1,0 +1,96 @@
+# Every push to main: build one image and deploy it to dev and pre.
+name: Build and Deploy to Development and Staging
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    # Release PR merges and other chores don't deploy (the release itself goes via cd-pro).
+    if: github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore')
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - uses: pnpm/setup@v1				### tns
+      - name: Env file
+        run: cp .env.example .env.local
+      - run: pnpm install --frozen-lockfile
+      - run: mise run check
+      - run: mise run audit # SEC-01: fails on high/critical advisories in production deps
+
+      - name: AWS credentials (Ireland)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: eu-west-1
+          role-to-assume: "arn:aws:iam::455170233623:role/github-schibsted-smb-melvis-satellite"
+          role-session-name: github-melvis-satellite
+      - name: Login to ECR (Ireland)
+        id: ecr-ireland
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: AWS credentials (Stockholm)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: eu-north-1
+          role-to-assume: "arn:aws:iam::455170233623:role/github-schibsted-smb-melvis-satellite"
+          role-session-name: github-melvis-satellite
+      - name: Login to ECR (Stockholm)
+        id: ecr-stockholm
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Version and image tag
+        id: meta
+        run: |
+          # SemVer build metadata: the last release plus the commit, e.g. 1.4.0+sha.abc1234.
+          echo "version=$(jq -r .version package.json)+sha.${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          # Docker tags can't contain "+": the image is tagged by commit instead.
+          echo "image=${{ steps.ecr-ireland.outputs.registry }}/${{ vars.IMAGE_NAME }}-dev:sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build development and staging images
+        env:
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+          REGISTRY_DEV: ${{ steps.ecr-ireland.outputs.registry }}
+          REGISTRY_PRE: ${{ steps.ecr-stockholm.outputs.registry }}
+          REPOSITORY: ${{ vars.IMAGE_NAME }}
+        run: |
+          tag="sha-${GITHUB_SHA}"
+          docker buildx build --push --pull --no-cache . \
+            --build-arg APP_VERSION="${APP_VERSION}" \
+            --build-arg GIT_SHA="${GITHUB_SHA}" \
+            -t "${REGISTRY_DEV}/${REPOSITORY}-dev:latest" \
+            -t "${REGISTRY_DEV}/${REPOSITORY}-dev:${tag}" \
+            -t "${REGISTRY_PRE}/${REPOSITORY}-pre:latest" \
+            -t "${REGISTRY_PRE}/${REPOSITORY}-pre:${tag}"
+
+  # The same image goes to both environments; only runtime env vars differ.
+  deploy:
+    name: Deploy ${{ matrix.env }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [dev, pre]
+    environment: ${{ matrix.env }}
+    steps:
+      - name: Restart deployment
+        env:
+          ARGOCD_APP: ${{ vars.ARGOCD_APP_PREFIX }}-${{ matrix.env }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+          ARGOCD_OPTS: ${{ vars.ARGOCD_OPTS }}
+          ARGOCD_SERVER: ${{ vars.ARGOCD_SERVER }}
+        run: echo argocd app actions run "$ARGOCD_APP" restart --kind Deployment
